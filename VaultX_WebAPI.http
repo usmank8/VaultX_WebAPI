@@ -1,0 +1,37 @@
+@VaultX_WebAPI_HostAddress = https://localhost:7026
+
+GET {{VaultX_WebAPI_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
+
+GET {{VaultX_WebAPI_HostAddress}}/api/users
+
+###
+
+POST {{VaultX_WebAPI_HostAddress}}/api/users
+Content-Type: application/json
+
+{
+  //User
+}
+
+###
+
+@id=string
+DELETE {{VaultX_WebAPI_HostAddress}}/api/users/{{id}}
+
+###
+
+GET {{VaultX_WebAPI_HostAddress}}/api/users/{{id}}
+
+###
+
+PUT {{VaultX_WebAPI_HostAddress}}/api/users/{{id}}
+Content-Type: application/json
+
+{
+  //User
+}
+
+###
