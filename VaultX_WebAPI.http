@@ -1,37 +1,18 @@
 @VaultX_WebAPI_HostAddress = https://localhost:7026
 
-GET {{VaultX_WebAPI_HostAddress}}/weatherforecast/
-Accept: application/json
+
+
+POST {{VaultX_WebAPI_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "210921@students.au.edu.pk",
+  "password": "123456"
+}
 
 ###
 
 GET {{VaultX_WebAPI_HostAddress}}/api/users
-
-###
-
-POST {{VaultX_WebAPI_HostAddress}}/api/users
-Content-Type: application/json
-
-{
-  //User
-}
-
-###
-
-@id=string
-DELETE {{VaultX_WebAPI_HostAddress}}/api/users/{{id}}
-
-###
-
-GET {{VaultX_WebAPI_HostAddress}}/api/users/{{id}}
-
-###
-
-PUT {{VaultX_WebAPI_HostAddress}}/api/users/{{id}}
-Content-Type: application/json
-
-{
-  //User
-}
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJodHRwOi8vc2NoZW1hcy54bWxzb2FwLm9yZy93cy8yMDA1LzA1L2lkZW50aXR5L2NsYWltcy9uYW1laWRlbnRpZmllciI6InVzcl8zMDJhMDZmMTg3OGU0YzAxODlhYTQ2NGZiOGMwYjA5MiIsImV4cCI6MTc1OTcyOTY2MiwiaXNzIjoiaHR0cHM6Ly9sb2NhbGhvc3Q6NzE2NSIsImF1ZCI6Imh0dHBzOi8vbG9jYWxob3N0OjcxNjUifQ.GgthUdhkH61lHDFl6J-nOToEqkNXexqqYAM1tvLCjeY
 
 ###
