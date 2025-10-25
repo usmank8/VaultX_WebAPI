@@ -13,7 +13,7 @@ public partial class Employee
 
     public string? Shift { get; set; }
 
-    public DateOnly? JoiningDate { get; set; }
+    public DateTime? JoiningDate { get; set; }
 
     public DateTime CreatedAt { get; set; }
 

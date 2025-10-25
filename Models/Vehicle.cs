@@ -15,7 +15,7 @@ public partial class Vehicle
 
     public string VehicleLicensePlateNumber { get; set; } = null!;
 
-    public string VehicleRfidtagId { get; set; } = null!;
+    public string VehicleRFIDTagId { get; set; } = null!;
 
     public bool IsGuest { get; set; }
 
@@ -23,7 +23,7 @@ public partial class Vehicle
 
     public DateTime UpdatedAt { get; set; }
 
-    public Guid? Residentid { get; set; }
+    public Guid Residentid { get; set; }
 
     public string VehicleColor { get; set; } = null!;
 

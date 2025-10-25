@@ -10,9 +10,9 @@ using VaultX_WebAPI.Models;
 
 namespace VaultX_WebAPI.Controllers
 {
-    [Authorize]
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize(Roles = "admin,employee")]
     public class ResidencesController : ControllerBase
     {
         private readonly VaultxDbContext _context;

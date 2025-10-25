@@ -5,112 +5,134 @@ using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Claims;
 using System.Threading.Tasks;
+using VaultX_WebAPI.DTOs;
 using VaultX_WebAPI.Models;
 
 namespace VaultX_WebAPI.Controllers
 {
-    [Authorize]
-    [Route("api/[controller]")]
     [ApiController]
-    public class SocietiesController : ControllerBase
+    [Route("api/[controller]")]
+    public class SocietyController : ControllerBase
     {
         private readonly VaultxDbContext _context;
 
-        public SocietiesController(VaultxDbContext context)
+        public SocietyController(VaultxDbContext context)
         {
             _context = context;
         }
 
-        [HttpGet]
-        public async Task<ActionResult<IEnumerable<Society>>> GetSocieties()
+        [HttpPost("add")]
+        [Authorize(Roles = "admin")]
+        public async Task<IActionResult> AddSociety([FromBody] CreateSocietyDto dto)
         {
-            return await _context.Societies.ToListAsync();
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (userId == null) return Unauthorized();
+
+            var adminUser = await _context.Users
+                .FirstOrDefaultAsync(u => u.Userid == userId && u.Role == "admin");
+
+            if (adminUser == null)
+            {
+                return NotFound("Admin user not found or unauthorized.");
+            }
+
+            var existingSociety = await _context.Societies
+                .FirstOrDefaultAsync(s => s.User.Userid == userId);
+
+            if (existingSociety != null)
+            {
+                return Conflict("A society linked to this admin user already exists.");
+            }
+
+            var newSociety = new Society
+            {
+                Name = dto.Name,
+                Address = dto.Address,
+                City = dto.City,
+                State = dto.State,
+                PostalCode = dto.PostalCode,
+                User = adminUser
+            };
+
+            try
+            {
+                _context.Societies.Add(newSociety);
+                await _context.SaveChangesAsync();
+                return Ok();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error saving society: {ex.Message}");
+                return StatusCode(500, "Failed to create society.");
+            }
         }
 
-        [HttpGet("{id}")]
-        public async Task<ActionResult<Society>> GetSociety(string id)
+        [HttpGet("mine")]
+        [Authorize(Roles = "admin,employee")]
+        public async Task<IActionResult> GetMySociety()
         {
-            var society = await _context.Societies.FindAsync(id);
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (userId == null) return Unauthorized();
+
+            Console.WriteLine($"Fetching society for admin ID: {userId}");
+            var societies = await _context.Societies
+                .Where(s => s.User.Userid == userId)
+                .ToListAsync();
+
+            if (!societies.Any())
+            {
+                return NotFound("Society not found for this admin user.");
+            }
+
+            var society = societies[0];
+
+            var dto = new SocietyDto
+            {
+                SocietyId = society.SocietyId,
+                Name = society.Name,
+                Address = society.Address,
+                City = society.City,
+                State = society.State,
+                PostalCode = society.PostalCode
+            };
+
+            return Ok(dto);
+        }
+
+        [HttpPut("update")]
+        [Authorize(Roles = "admin")]
+        public async Task<IActionResult> UpdateSociety([FromBody] UpdateSocietyDto dto)
+        {
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (userId == null) return Unauthorized();
+
+            var society = await _context.Societies
+                .Include(s => s.User)
+                .FirstOrDefaultAsync(s => s.User.Userid == userId);
 
             if (society == null)
             {
-                return NotFound();
+                return NotFound("Society not found for this user.");
             }
 
-            return society;
-        }
-
-        [HttpPut("{id}")]
-        public async Task<IActionResult> PutSociety(string id, Society society)
-        {
-            if (id != society.SocietyId)
-            {
-                return BadRequest();
-            }
-
-            _context.Entry(society).State = EntityState.Modified;
+            if (dto.Name != null) society.Name = dto.Name;
+            if (dto.Address != null) society.Address = dto.Address;
+            if (dto.City != null) society.City = dto.City;
+            if (dto.State != null) society.State = dto.State;
+            if (dto.PostalCode != null) society.PostalCode = dto.PostalCode;
 
             try
             {
                 await _context.SaveChangesAsync();
+                return Ok();
             }
-            catch (DbUpdateConcurrencyException)
+            catch (Exception ex)
             {
-                if (!SocietyExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
+                Console.WriteLine($"Error updating society: {ex.Message}");
+                return StatusCode(500, "Failed to update society");
             }
-
-            return NoContent();
-        }
-
-        [HttpPost]
-        public async Task<ActionResult<Society>> PostSociety(Society society)
-        {
-            _context.Societies.Add(society);
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateException)
-            {
-                if (SocietyExists(society.SocietyId))
-                {
-                    return Conflict();
-                }
-                else
-                {
-                    throw;
-                }
-            }
-
-            return CreatedAtAction("GetSociety", new { id = society.SocietyId }, society);
-        }
-
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteSociety(string id)
-        {
-            var society = await _context.Societies.FindAsync(id);
-            if (society == null)
-            {
-                return NotFound();
-            }
-
-            _context.Societies.Remove(society);
-            await _context.SaveChangesAsync();
-
-            return NoContent();
-        }
-
-        private bool SocietyExists(string id)
-        {
-            return _context.Societies.Any(e => e.SocietyId == id);
         }
     }
 }

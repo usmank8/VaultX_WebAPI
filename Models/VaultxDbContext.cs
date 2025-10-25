@@ -339,7 +339,7 @@ public partial class VaultxDbContext : DbContext
             entity.Property(e => e.VehicleName)
                 .HasMaxLength(255)
                 .HasColumnName("vehicleName");
-            entity.Property(e => e.VehicleRfidtagId)
+            entity.Property(e => e.VehicleRFIDTagId)
                 .HasMaxLength(255)
                 .HasColumnName("vehicleRFIDTagId");
             entity.Property(e => e.VehicleType)
