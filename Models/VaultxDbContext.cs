@@ -92,43 +92,75 @@ public partial class VaultxDbContext : DbContext
             entity.Property(e => e.GuestId)
                 .HasMaxLength(255)
                 .HasColumnName("guestId");
+
             entity.Property(e => e.CreatedAt)
-                .HasDefaultValueSql("(getdate())")
                 .HasColumnType("datetime")
                 .HasColumnName("createdAt");
+
             entity.Property(e => e.Eta)
                 .HasColumnType("datetime")
                 .HasColumnName("eta");
+
             entity.Property(e => e.GuestName)
                 .HasMaxLength(255)
                 .HasColumnName("guestName");
+
             entity.Property(e => e.GuestPhoneNumber)
                 .HasMaxLength(255)
                 .HasColumnName("guestPhoneNumber");
+
+            entity.Property(e => e.Gender)
+                .HasMaxLength(20)
+                .HasColumnName("Gender");
+
+            entity.Property(e => e.CheckoutTime)
+                .HasColumnType("datetime")
+                .HasColumnName("CheckoutTime");
+
+            entity.Property(e => e.ActualArrivalTime)
+                .HasColumnType("datetime")
+                .HasColumnName("ActualArrivalTime");
+
+            entity.Property(e => e.Status)
+                .HasMaxLength(20)
+                .HasColumnName("Status");
+
+            entity.Property(e => e.Userid)
+                .HasMaxLength(255)
+                .HasColumnName("userid");
+
             entity.Property(e => e.IsVerified).HasColumnName("isVerified");
+
             entity.Property(e => e.QrCode)
                 .HasMaxLength(255)
-                .HasDefaultValue("Processing")
                 .HasColumnName("qrCode");
+
             entity.Property(e => e.ResidenceId).HasColumnName("residenceId");
+
             entity.Property(e => e.UpdatedAt)
-                .HasDefaultValueSql("(getdate())")
                 .HasColumnType("datetime")
                 .HasColumnName("updatedAt");
+
             entity.Property(e => e.VehicleId)
                 .HasMaxLength(255)
                 .HasColumnName("vehicleId");
+
             entity.Property(e => e.VisitCompleted).HasColumnName("visitCompleted");
 
-            entity.HasOne(d => d.Residence).WithMany(p => p.Guests)
+            entity.HasOne(d => d.User)
+                .WithMany(p => p.Guests)
+                .HasForeignKey(d => d.Userid)
+                .OnDelete(DeleteBehavior.NoAction)
+                .HasConstraintName("FK_guests_users_userid");
+
+            entity.HasOne(d => d.Residence)
+                .WithMany(p => p.Guests)
                 .HasForeignKey(d => d.ResidenceId)
-                .OnDelete(DeleteBehavior.Cascade)
-                .HasConstraintName("FK_426b35f2348dbfdb19a294d3d00");
+                .HasConstraintName("FK_guests_residences_residenceId");
 
             entity.HasOne(d => d.Vehicle).WithOne(p => p.Guest)
                 .HasForeignKey<Guest>(d => d.VehicleId)
-                .OnDelete(DeleteBehavior.SetNull)
-                .HasConstraintName("FK_cac7e9be74c70ea79eae4ac5c38");
+                .HasConstraintName("FK_guests_vehicles_vehicleId");
         });
 
         modelBuilder.Entity<Otp>(entity =>

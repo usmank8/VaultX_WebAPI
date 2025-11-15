@@ -38,4 +38,8 @@ public partial class User
     public virtual ICollection<Residence> Residences { get; set; } = new List<Residence>();
 
     public virtual Society? Society { get; set; }
+
+     public virtual ICollection<Guest> Guests { get; set; } = new List<Guest>();
+
+
 }
