@@ -178,11 +178,30 @@ namespace VaultX_WebAPI.DTOs
 
     public class AddGuestDto
     {
-        public string GuestName { get; set; }
-        public string GuestPhoneNumber { get; set; }
-        public string Eta { get; set; }
-        public bool VisitCompleted { get; set; } = false;
-        public AddGuestVehicleDto? Vehicle { get; set; }
+        [Required(ErrorMessage = "Guest name is required")]
+        public string GuestName { get; set; } = null!;
+
+        [Required(ErrorMessage = "Phone number is required")]
+        public string GuestPhoneNumber { get; set; } = null!;
+
+        public string? Gender { get; set; }  // ✅ Make sure this exists
+
+        [Required(ErrorMessage = "Expected arrival time is required")]
+        public DateTime Eta { get; set; }
+
+        [Required(ErrorMessage = "Checkout time is required")]
+        public DateTime CheckoutTime { get; set; }  // ✅ Make sure this exists
+
+        [Required(ErrorMessage = "Residence ID is required")]
+        public Guid? ResidenceId { get; set; }
+
+        public string? VehicleId { get; set; }
+    }
+
+    public class ExtendGuestTimeDto
+    {
+        [Required(ErrorMessage = "New checkout time is required")]
+        public DateTime NewCheckoutTime { get; set; }
     }
 
     public enum ResidenceEnum
