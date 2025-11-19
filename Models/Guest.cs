@@ -31,7 +31,7 @@ public partial class Guest
     public string QrCode { get; set; } = null!;
 
     // ===== RELATIONSHIPS (FOREIGN KEYS) =====
-    public string Userid { get; set; } = null!;  // ✅ NEW: FK to Users
+    public string? Userid { get; set; }  
     
     public Guid? ResidenceId { get; set; }
     
