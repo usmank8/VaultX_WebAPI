@@ -19,28 +19,6 @@ namespace VaultX_WebAPI.Controllers
             _context = context;
         }
 
-        [HttpPatch("approve/{residentID}")]
-        public async Task<IActionResult> ApproveUser(string residentID)
-        {
-            var residence = await _context.Residences
-                .Include(r => r.User)
-                .FirstOrDefaultAsync(r => r.User.Userid == residentID);
-            if (residence == null)
-            {
-                return NotFound(new { Message = "Residence not found for the given ID or user ID." });
-            }
-            residence.IsApprovedBySociety = true;
-            try
-            {
-                await _context.SaveChangesAsync();
-                return Ok(new ApprovalResponse { Message = "User residence approved successfully." });
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { Message = "Failed to approve user residence." });
-            }
-        }
-
         [HttpGet("approval/pending")]
         public async Task<IActionResult> GetPendingApprovals()
         {
@@ -118,6 +96,30 @@ namespace VaultX_WebAPI.Controllers
                 VehicleRFIDTagId = v.VehicleRFIDTagId
             }).ToList();
             return Ok(dtos);
+        }
+
+        [HttpPatch("approve/{residenceID}")]
+        public async Task<IActionResult> ApproveResidence(Guid residenceID)
+        {
+            var residence = await _context.Residences
+                .FirstOrDefaultAsync(r => r.Id == residenceID);
+                
+            if (residence == null)
+            {
+                return NotFound(new { Message = "Residence not found" });
+            }
+            
+            residence.IsApprovedBySociety = true;
+            residence.UpdatedAt = DateTime.UtcNow;
+            
+            await _context.SaveChangesAsync();
+            
+            return Ok(new 
+            { 
+                Message = "Residence approved successfully",
+                ResidenceId = residence.Id,
+                FlatNumber = residence.Residence1
+            });
         }
     }
 }

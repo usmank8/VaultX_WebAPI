@@ -28,58 +28,73 @@ namespace VaultX_WebAPI.Controllers
         [Authorize(Roles = "admin")]
         public async Task<IActionResult> CreateEmployee([FromBody] CreateEmployeeDto dto)
         {
-            
-            var existingUser = await _context.Users
-                .FirstOrDefaultAsync(u => u.Email == dto.Email || (!string.IsNullOrEmpty(dto.Cnic) && u.Cnic == dto.Cnic));
-
-            if (existingUser != null)
-            {
-                return Conflict("User with this email or CNIC already exists.");
-            }
-
-            using var transaction = await _context.Database.BeginTransactionAsync();
-
             try
             {
+                // Validate: Check if email or CNIC already exists
+                var existingUser = await _context.Users
+                    .FirstOrDefaultAsync(u => u.Email == dto.Email || u.Cnic == dto.Cnic);
+
+                if (existingUser != null)
+                {
+                    return BadRequest(new { message = "Email or CNIC already exists" });
+                }
+
+                // 1️⃣ CREATE USER RECORD
+                var userId = "usr_" + Guid.NewGuid().ToString("N");
                 var hashedPassword = BCrypt.Net.BCrypt.HashPassword(dto.Password);
 
                 var user = new User
                 {
-                    Email = dto.Email,
-                    
-                    // JoiningDate = !string.IsNullOrEmpty(dto.JoiningDate) ? DateTime.Parse(dto.JoiningDate) : null
-
-                    CreatedAt = dto.JoiningDate ?? DateTime.UtcNow,
-                    Password = hashedPassword,
+                    Userid = userId,
                     Firstname = dto.Firstname,
                     Lastname = dto.Lastname,
+                    Email = dto.Email,
+                    Password = hashedPassword,
                     Phone = dto.Phone,
                     Cnic = dto.Cnic,
-                    Role = "employee"
+                    Role = "employee",
+                    IsVerified = true,
+                    IsEmailVerified = true,
+                    IsBlocked = false,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
                 };
 
-                _context.Users.Add(user);
+                await _context.Users.AddAsync(user);
                 await _context.SaveChangesAsync();
 
+                // 2️⃣ CREATE EMPLOYEE RECORD
                 var employee = new Employee
                 {
-                    User = user,
+                    Id = Guid.NewGuid(),
+                    Userid = userId,  // Link to user
                     InternalRole = dto.InternalRole,
                     Department = dto.Department,
                     Shift = dto.Shift,
                     JoiningDate = dto.JoiningDate ?? DateTime.UtcNow,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
                 };
 
-                _context.Employees.Add(employee);
+                await _context.Employees.AddAsync(employee);
                 await _context.SaveChangesAsync();
 
-                await transaction.CommitAsync();
-                return Ok();
+                return Ok(new
+                {
+                    message = "Employee created successfully",
+                    employeeId = employee.Id.ToString(),
+                    userId = userId,
+                    email = user.Email,
+                    fullName = $"{user.Firstname} {user.Lastname}",
+                    internalRole = employee.InternalRole,
+                    department = employee.Department,
+                    shift = employee.Shift,
+                    joiningDate = employee.JoiningDate
+                });
             }
             catch (Exception ex)
             {
-                await transaction.RollbackAsync();
-                return StatusCode(500, "Failed to create employee.");
+                return StatusCode(500, new { message = "Failed to create employee", error = ex.Message });
             }
         }
 

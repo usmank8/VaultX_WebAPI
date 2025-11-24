@@ -178,24 +178,19 @@ namespace VaultX_WebAPI.DTOs
 
     public class AddGuestDto
     {
-        [Required(ErrorMessage = "Guest name is required")]
-        public string GuestName { get; set; } = null!;
-
-        [Required(ErrorMessage = "Phone number is required")]
-        public string GuestPhoneNumber { get; set; } = null!;
-
-        public string? Gender { get; set; }  // ✅ Make sure this exists
-
-        [Required(ErrorMessage = "Expected arrival time is required")]
+        public string GuestName { get; set; } = string.Empty;
+        public string GuestPhoneNumber { get; set; } = string.Empty;
+        public string? Gender { get; set; }
         public DateTime Eta { get; set; }
-
-        [Required(ErrorMessage = "Checkout time is required")]
-        public DateTime CheckoutTime { get; set; }  // ✅ Make sure this exists
-
-        [Required(ErrorMessage = "Residence ID is required")]
+        public DateTime CheckoutTime { get; set; }
         public Guid? ResidenceId { get; set; }
-
-        public string? VehicleId { get; set; }
+        
+        // ✅ Vehicle details (optional - will auto-create if provided)
+        public string? VehicleName { get; set; }
+        public string? VehicleModel { get; set; }
+        public string? VehicleLicensePlateNumber { get; set; }
+        public string? VehicleType { get; set; }
+        public string? VehicleColor { get; set; }
     }
 
     public class ExtendGuestTimeDto

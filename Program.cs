@@ -18,6 +18,18 @@ builder.Services.AddControllers().AddJsonOptions(options =>
 builder.Services.AddDbContext<VaultxDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+// Add CORS
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowReactApp", policy =>
+    {
+        policy.WithOrigins("http://localhost:3000")
+              .AllowAnyMethod()
+              .AllowAnyHeader()
+              .AllowCredentials();
+    });
+});
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -82,6 +94,9 @@ app.UseRouting();
 app.UseSwagger();
 
 app.UseHttpsRedirection();
+
+// Use CORS (must be before Authentication/Authorization)
+app.UseCors("AllowReactApp");
 
 app.UseAuthentication();
 

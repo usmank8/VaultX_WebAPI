@@ -182,6 +182,38 @@ namespace VaultX_WebAPI.Controllers
                     });
                 }
 
+                // ✅ AUTO-CREATE VEHICLE if vehicle details are provided
+                string? vehicleId = null;  // Removed dto.VehicleId
+
+                if (!string.IsNullOrEmpty(dto.VehicleName) ||
+                    !string.IsNullOrEmpty(dto.VehicleModel) ||
+                    !string.IsNullOrEmpty(dto.VehicleLicensePlateNumber))
+                {
+                    var vehicle = new Vehicle
+                    {
+                        VehicleId = Guid.NewGuid().ToString(),
+                        VehicleName = dto.VehicleName ?? "Guest Vehicle",
+                        VehicleModel = dto.VehicleModel ?? "N/A",
+                        VehicleLicensePlateNumber = dto.VehicleLicensePlateNumber ?? "N/A",
+                        VehicleType = dto.VehicleType ?? "Sedan",
+                        VehicleColor = dto.VehicleColor ?? "N/A",
+                        VehicleRFIDTagId = "",  // Guests don't have RFID tags
+                        IsGuest = true,  // ✅ Mark as guest vehicle
+                        Residentid = residence.Id,  // Link to residence
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow
+                    };
+
+                    await _context.Vehicles.AddAsync(vehicle);
+                    await _context.SaveChangesAsync();
+
+                    vehicleId = vehicle.VehicleId;
+
+                    _logger.LogInformation(
+                        "Guest vehicle created: {VehicleId} ({VehicleName} - {LicensePlate}) for residence {ResidenceId}",
+                        vehicle.VehicleId, vehicle.VehicleName, vehicle.VehicleLicensePlateNumber, residence.Id);
+                }
+
                 var guestId = "guest_" + Guid.NewGuid().ToString("N");
 
                 var guest = new Guest
@@ -196,7 +228,7 @@ namespace VaultX_WebAPI.Controllers
                     Status = "pending",
                     Userid = residentUserId,
                     ResidenceId = dto.ResidenceId,
-                    VehicleId = dto.VehicleId,
+                    VehicleId = vehicleId,  // Will be null if no vehicle details provided
                     QrCode = null,
                     IsVerified = false,
                     VisitCompleted = false,

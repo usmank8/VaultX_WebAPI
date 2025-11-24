@@ -49,3 +49,4 @@ public partial class Guest
     
     public virtual Vehicle? Vehicle { get; set; }
 }
+
