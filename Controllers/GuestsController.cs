@@ -25,7 +25,7 @@ namespace VaultX_WebAPI.Controllers
         // GET: api/Guests (All guests - Admin only)
         // ============================================
         [HttpGet]
-        [Authorize(Roles = "admin")]
+        [Authorize(Roles = "admin, employee")]
         public async Task<IActionResult> GetAllGuests()
         {
             try
@@ -480,6 +480,136 @@ namespace VaultX_WebAPI.Controllers
         }
 
         // ============================================
+        // GET: api/Guests/verified (Get verified/active guests for dashboard)
+        // ============================================
+        [HttpGet("verified")]
+        [Authorize(Roles = "admin, employee")]
+        public async Task<IActionResult> GetVerifiedGuests()
+        {
+            try
+            {
+                // Auto-complete expired guests first
+                await AutoCompleteExpiredGuests();
+
+                var now = DateTime.UtcNow;
+
+                // Get ONLY verified guests who are currently active
+                var verifiedGuests = await _context.Guests
+                    .Include(g => g.User)
+                    .Include(g => g.Residence)
+                    .Include(g => g.Vehicle)
+                    .Where(g => 
+                        g.IsVerified == true &&          // ✅ ONLY QR scanned guests
+                        g.Status == "active" &&           // ✅ Currently active
+                        g.CheckoutTime > now)             // ✅ Not expired
+                    .OrderByDescending(g => g.ActualArrivalTime)
+                    .Select(g => new
+                    {
+                        g.GuestId,
+                        g.GuestName,
+                        g.GuestPhoneNumber,
+                        g.Gender,
+                        
+                        // Resident info
+                        ResidentName = (g.User != null) 
+                            ? $"{g.User.Firstname} {g.User.Lastname}" 
+                            : "Unknown",
+                        ResidentEmail = g.User != null ? g.User.Email : "",
+                        ResidentPhone = g.User != null ? g.User.Phone : "",
+                        
+                        // Residence info
+                        Residence = g.Residence != null ? new
+                        {
+                            g.Residence.Block,
+                            FlatNumber = g.Residence.FlatNumber,
+                            Address = g.Residence.AddressLine1
+                        } : null,
+                        
+                        // Vehicle info (if any)
+                        Vehicle = g.Vehicle != null ? new
+                        {
+                            g.Vehicle.VehicleName,
+                            g.Vehicle.VehicleModel,
+                            g.Vehicle.VehicleType,
+                            g.Vehicle.VehicleLicensePlateNumber,
+                            g.Vehicle.VehicleColor
+                        } : null,
+                        
+                        // Timing details
+                        ExpectedArrival = g.Eta,
+                        ActualArrival = g.ActualArrivalTime,
+                        CheckoutTime = g.CheckoutTime,
+                        IsLate = g.ActualArrivalTime > g.Eta,
+                        MinutesLate = g.ActualArrivalTime > g.Eta 
+                            ? (g.ActualArrivalTime.Value - g.Eta).TotalMinutes 
+                            : 0,
+                        
+                        // Time remaining
+                        TimeRemainingHours = (g.CheckoutTime - now).TotalHours,
+                        TimeRemainingFormatted = FormatTimeRemaining(g.CheckoutTime - now),
+                        
+                        // Status
+                        g.Status,
+                        g.IsVerified,
+                        g.CreatedAt,
+                        VerifiedAt = g.ActualArrivalTime
+                    })
+                    .ToListAsync();
+
+                return Ok(new
+                {
+                    success = true,
+                    count = verifiedGuests.Count,
+                    currentTime = now,
+                    guests = verifiedGuests
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving verified guests");
+                return StatusCode(500, new 
+                { 
+                    success = false,
+                    message = "Error retrieving verified guests", 
+                    error = ex.Message 
+                });
+            }
+        }
+
+        // ============================================
+        // GET: api/Guests/active-count (Quick count for dashboard stats)
+        // ============================================
+        [HttpGet("active-count")]
+        [Authorize(Roles = "admin, employee")]
+        public async Task<IActionResult> GetActiveGuestCount()
+        {
+            try
+            {
+                await AutoCompleteExpiredGuests();
+                
+                var now = DateTime.UtcNow;
+                
+                // Count ONLY verified active guests
+                var activeCount = await _context.Guests
+                    .CountAsync(g => 
+                        g.Status == "active" && 
+                        g.IsVerified == true &&
+                        g.CheckoutTime > now);
+
+                return Ok(new
+                {
+                    activeGuests = activeCount,
+                    currentTime = now
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting active guest count");
+                return StatusCode(500, new { message = "Error", error = ex.Message });
+            }
+        }
+
+        // ============================================
         // HELPER: Auto-complete expired guests
         // ============================================
         private async Task<int> AutoCompleteExpiredGuests()
@@ -541,6 +671,23 @@ namespace VaultX_WebAPI.Controllers
                 byte[] qrCodeBytes = qrCode.GetGraphic(20);
                 return Convert.ToBase64String(qrCodeBytes);
             }
+        }
+
+        // ============================================
+        // HELPER: Format time remaining
+        // ============================================
+        private string FormatTimeRemaining(TimeSpan timeSpan)
+        {
+            if (timeSpan.TotalMinutes < 0)
+                return "Expired";
+            
+            if (timeSpan.TotalHours < 1)
+                return $"{timeSpan.TotalMinutes:F0} minutes";
+            
+            if (timeSpan.TotalHours < 24)
+                return $"{timeSpan.TotalHours:F1} hours";
+            
+            return $"{timeSpan.TotalDays:F1} days";
         }
     }
 }
