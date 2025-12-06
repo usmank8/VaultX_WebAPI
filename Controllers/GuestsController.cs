@@ -544,9 +544,8 @@ namespace VaultX_WebAPI.Controllers
                             ? (g.ActualArrivalTime.Value - g.Eta).TotalMinutes 
                             : 0,
                         
-                        // Time remaining
+                        // Time remaining (raw value - we'll format after)
                         TimeRemainingHours = (g.CheckoutTime - now).TotalHours,
-                        TimeRemainingFormatted = FormatTimeRemaining(g.CheckoutTime - now),
                         
                         // Status
                         g.Status,
@@ -556,12 +555,37 @@ namespace VaultX_WebAPI.Controllers
                     })
                     .ToListAsync();
 
+                // ✅ NOW format time remaining AFTER fetching data
+                var result = verifiedGuests.Select(g => new
+                {
+                    g.GuestId,
+                    g.GuestName,
+                    g.GuestPhoneNumber,
+                    g.Gender,
+                    g.ResidentName,
+                    g.ResidentEmail,
+                    g.ResidentPhone,
+                    g.Residence,
+                    g.Vehicle,
+                    g.ExpectedArrival,
+                    g.ActualArrival,
+                    g.CheckoutTime,
+                    g.IsLate,
+                    g.MinutesLate,
+                    g.TimeRemainingHours,
+                    TimeRemainingFormatted = FormatTimeRemaining(TimeSpan.FromHours(g.TimeRemainingHours)),
+                    g.Status,
+                    g.IsVerified,
+                    g.CreatedAt,
+                    g.VerifiedAt
+                }).ToList();
+
                 return Ok(new
                 {
                     success = true,
-                    count = verifiedGuests.Count,
+                    count = result.Count,
                     currentTime = now,
-                    guests = verifiedGuests
+                    guests = result
                 });
             }
             catch (Exception ex)
@@ -676,7 +700,7 @@ namespace VaultX_WebAPI.Controllers
         // ============================================
         // HELPER: Format time remaining
         // ============================================
-        private string FormatTimeRemaining(TimeSpan timeSpan)
+        private static string FormatTimeRemaining(TimeSpan timeSpan)
         {
             if (timeSpan.TotalMinutes < 0)
                 return "Expired";
