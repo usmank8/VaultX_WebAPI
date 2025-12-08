@@ -22,6 +22,28 @@ namespace VaultX_WebAPI.Controllers
             _context = context;
         }
 
+        /// <summary>
+        /// Get all residences for a specific user (Admin/Employee only)
+        /// </summary>
+        [HttpGet("user/{userId}")]
+        public async Task<IActionResult> GetResidencesByUser(string userId)
+        {
+            var residences = await _context.Residences
+                .Where(r => r.Userid == userId)
+                .Select(r => new
+                {
+                    id = r.Id,
+                    addressLine1 = r.AddressLine1,
+                    addressLine2 = r.AddressLine2,
+                    block = r.Block,
+                    isApprovedBySociety = r.IsApprovedBySociety,
+                    isPrimary = r.IsPrimary
+                })
+                .ToListAsync();
+
+            return Ok(residences);
+        }
+
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Residence>>> GetResidences()
         {

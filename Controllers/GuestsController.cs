@@ -713,6 +713,77 @@ namespace VaultX_WebAPI.Controllers
             
             return $"{timeSpan.TotalDays:F1} days";
         }
+
+        /// <summary>
+        /// Get currently verified (active) guests for a specific residence (Admin/Employee only)
+        /// Returns guests who are currently inside the society with their vehicle info
+        /// </summary>
+        [HttpGet("residence/{residenceId}/verified")]
+        [Authorize(Roles = "admin,employee")]
+        public async Task<IActionResult> GetVerifiedGuestsByResidence(Guid residenceId)
+        {
+            // Verify residence exists
+            var residenceExists = await _context.Residences.AnyAsync(r => r.Id == residenceId);
+            if (!residenceExists)
+            {
+                return NotFound(new { message = "Residence not found" });
+            }
+
+            var now = DateTime.UtcNow;
+
+            var guests = await _context.Guests
+                .Include(g => g.Vehicle)  // Include vehicle navigation property
+                .Where(g =>
+                    g.ResidenceId == residenceId &&
+                    g.IsVerified == true &&
+                    g.Status == "active" &&
+                    g.CheckoutTime > now &&
+                    g.VisitCompleted == false)
+                .ToListAsync();
+
+            // Map to response DTO with calculated fields
+            var guestDtos = guests.Select(g => new
+            {
+                guestId = g.GuestId,
+                guestName = g.GuestName,
+                guestPhoneNumber = g.GuestPhoneNumber,
+                gender = g.Gender,
+                eta = g.Eta,
+                checkoutTime = g.CheckoutTime,
+                actualArrivalTime = g.ActualArrivalTime,
+                status = g.Status,
+                isVerified = g.IsVerified,
+                
+                // Timing calculations
+                isLate = g.ActualArrivalTime.HasValue && g.ActualArrivalTime.Value > g.Eta,
+                minutesLate = g.ActualArrivalTime.HasValue && g.ActualArrivalTime.Value > g.Eta
+                    ? (g.ActualArrivalTime.Value - g.Eta).TotalMinutes
+                    : 0,
+                timeRemainingHours = (g.CheckoutTime - now).TotalHours,
+                timeRemainingFormatted = $"{Math.Round((g.CheckoutTime - now).TotalHours, 1)} hours",
+                
+                // Vehicle info (directly embedded, null if no vehicle)
+                vehicle = g.Vehicle == null ? null : new
+                {
+                    vehicleId = g.Vehicle.VehicleId,
+                    vehicleName = g.Vehicle.VehicleName,
+                    vehicleModel = g.Vehicle.VehicleModel,
+                    vehicleType = g.Vehicle.VehicleType,
+                    vehicleLicensePlateNumber = g.Vehicle.VehicleLicensePlateNumber,
+                    vehicleRFIDTagId = g.Vehicle.VehicleRFIDTagId,
+                    vehicleColor = g.Vehicle.VehicleColor
+                }
+            }).ToList();
+
+            return Ok(new
+            {
+                success = true,
+                count = guestDtos.Count,
+                residenceId = residenceId,
+                currentTime = now,
+                guests = guestDtos
+            });
+        }
     }
 }
 

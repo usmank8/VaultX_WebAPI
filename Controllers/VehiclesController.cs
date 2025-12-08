@@ -14,7 +14,6 @@ namespace VaultX_WebAPI.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize(Roles = "resident")]
     public class VehicleController : ControllerBase
     {
         private readonly VaultxDbContext _context;
@@ -25,6 +24,7 @@ namespace VaultX_WebAPI.Controllers
         }
 
         [HttpPost("add")]
+        [Authorize(Roles = "resident")]
         public async Task<IActionResult> AddVehicle([FromBody] AddVehicleDto dto)
         {
             var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
@@ -59,42 +59,8 @@ namespace VaultX_WebAPI.Controllers
             return Ok(new { Message = "Vehicle added successfully.", VehicleId = vehicle.VehicleId });
         }
 
-        [HttpPost("add-guest")]
-        public async Task<IActionResult> AddGuestVehicle([FromBody] AddGuestVehicleDto dto)
-        {
-            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (userId == null) return Unauthorized();
-
-            var residence = await _context.Residences
-                .FirstOrDefaultAsync(r => r.Id == dto.ResidenceId && r.Userid == userId);
-
-            if (residence == null)
-            {
-                return NotFound("Residence not found or does not belong to you.");
-            }
-
-            var vehicle = new Vehicle
-            {
-                VehicleId = Guid.NewGuid().ToString(),
-                VehicleName = dto.VehicleName,
-                VehicleModel = dto.VehicleModel,
-                VehicleType = dto.VehicleType,
-                VehicleLicensePlateNumber = dto.VehicleLicensePlateNumber,
-                VehicleRFIDTagId = dto.VehicleRFIDTagId,
-                VehicleColor = dto.VehicleColor,
-                Residentid = dto.ResidenceId,
-                IsGuest = true,
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
-            };
-
-            _context.Vehicles.Add(vehicle);
-            await _context.SaveChangesAsync();
-
-            return Ok(new { Message = "Guest vehicle added successfully.", VehicleId = vehicle.VehicleId });
-        }
-
         [HttpGet]
+        [Authorize(Roles = "resident")]
         public async Task<IActionResult> GetAllVehiclesByUserId()
         {
             var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
@@ -138,6 +104,39 @@ namespace VaultX_WebAPI.Controllers
             }).ToList();
 
             return Ok(dtos);
+        }
+
+        /// <summary>
+        /// Get all vehicles for a specific residence (Admin/Employee only)
+        /// Filters out guest vehicles
+        /// </summary>
+        [HttpGet("residence/{residenceId}")]
+        [Authorize(Roles = "admin,employee")]
+        public async Task<IActionResult> GetVehiclesByResidence(Guid residenceId)
+        {
+            // Verify residence exists
+            var residenceExists = await _context.Residences.AnyAsync(r => r.Id == residenceId);
+            if (!residenceExists)
+            {
+                return NotFound(new { message = "Residence not found" });
+            }
+
+            var vehicles = await _context.Vehicles
+                .Where(v => v.Residentid == residenceId && v.IsGuest == false)  // ✅ Fixed: Residentid (not ResidenceId)
+                .Select(v => new
+                {
+                    vehicleId = v.VehicleId,
+                    vehicleName = v.VehicleName,
+                    vehicleType = v.VehicleType,
+                    vehicleModel = v.VehicleModel,
+                    vehicleLicensePlateNumber = v.VehicleLicensePlateNumber,
+                    vehicleRFIDTagId = v.VehicleRFIDTagId,
+                    vehicleColor = v.VehicleColor,
+                    isGuest = v.IsGuest
+                })
+                .ToListAsync();
+
+            return Ok(vehicles);
         }
     }
 
