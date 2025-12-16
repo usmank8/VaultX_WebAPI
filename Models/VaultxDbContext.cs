@@ -29,6 +29,8 @@ public partial class VaultxDbContext : DbContext
 
     public virtual DbSet<Vehicle> Vehicles { get; set; }
 
+    public virtual DbSet<VehicleAccessLog> VehicleAccessLogs { get; set; }
+
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
 #warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
         => optionsBuilder.UseSqlServer("name=ConnectionStrings:DefaultConnection");
@@ -382,6 +384,46 @@ public partial class VaultxDbContext : DbContext
                 .HasForeignKey(d => d.Residentid)
                 .OnDelete(DeleteBehavior.SetNull)
                 .HasConstraintName("FK_768cdb766dfb621e783856f55ee");
+        });
+
+        modelBuilder.Entity<VehicleAccessLog>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+
+            entity.ToTable("vehicle_access_logs");
+
+            entity.HasIndex(e => e.Timestamp);
+            entity.HasIndex(e => e.VehicleId);
+
+            entity.Property(e => e.Id)
+                .HasDefaultValueSql("(newsequentialid())")
+                .HasColumnName("id");
+
+            entity.Property(e => e.VehicleId)
+                .HasMaxLength(255)
+                .HasColumnName("vehicleId");
+
+            entity.Property(e => e.AccessType)
+                .HasMaxLength(10)
+                .HasColumnName("accessType");
+
+            entity.Property(e => e.Timestamp)
+                .HasColumnType("datetime")
+                .HasColumnName("timestamp");
+
+            entity.Property(e => e.GateName)
+                .HasMaxLength(100)
+                .HasColumnName("gateName");
+
+            entity.Property(e => e.RecordedBy)
+                .HasMaxLength(255)
+                .HasColumnName("recordedBy");
+
+            entity.HasOne(d => d.Vehicle)
+                .WithMany()
+                .HasForeignKey(d => d.VehicleId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_vehicle_access_logs_vehicles");
         });
 
         OnModelCreatingPartial(modelBuilder);
