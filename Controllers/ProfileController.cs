@@ -23,12 +23,13 @@ namespace VaultX_WebAPI.Controllers
         }
 
         [HttpGet("me")]
-        public async Task<ActionResult<GetUserProfileDto>> GetUserProfile()
+        [Authorize]
+        public async Task<IActionResult> GetUserProfile()
         {
             var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
             {
-                return Unauthorized("User ID not found.");
+                return Unauthorized(new { message = "User ID not found." });
             }
 
             var user = await _context.Users
@@ -37,25 +38,33 @@ namespace VaultX_WebAPI.Controllers
 
             if (user == null)
             {
-                return NotFound("User not found.");
+                return NotFound(new { message = "User not found." });
             }
 
             var primaryResidence = user.Residences?.FirstOrDefault(r => r.IsPrimary);
 
-            return Ok(new GetUserProfileDto
+            if (primaryResidence == null)
             {
-                Firstname = user.Firstname ?? string.Empty,
-                Lastname = user.Lastname ?? string.Empty,
-                Phone = user.Phone ?? string.Empty,
-                Cnic = user.Cnic ?? string.Empty,
-                Email = user.Email ?? string.Empty,
-                Residence = primaryResidence != null ? new ResidenceDto
+                return NotFound(new { message = "No residence found for this user." });
+            }
+
+            return Ok(new
+            {
+                userid = user.Userid,
+                firstname = user.Firstname,
+                lastname = user.Lastname,
+                Phone = user.Phone,
+                cnic = user.Cnic,
+                email = user.Email,
+                isApprovedBySociety = primaryResidence.IsApprovedBySociety,  // ✅ Add this
+                residence = new
                 {
-                    AddressLine1 = primaryResidence.AddressLine1,
-                    Block = primaryResidence.Block,
-                    Residence = primaryResidence.Residence1,
-                    ResidenceType = primaryResidence.ResidenceType
-                } : null
+                    addressLine1 = primaryResidence.AddressLine1,
+                    block = primaryResidence.Block,
+                    residence = primaryResidence.Residence1,
+                    residenceType = primaryResidence.ResidenceType,
+                    isApprovedBySociety = primaryResidence.IsApprovedBySociety  // ✅ Also here
+                }
             });
         }
 

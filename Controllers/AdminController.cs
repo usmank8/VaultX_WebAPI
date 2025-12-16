@@ -56,9 +56,9 @@ namespace VaultX_WebAPI.Controllers
             {
                 return BadRequest("Invalid status. Must be 'approved' or 'pending'.");
             }
-            bool isApproved = status == "approved";
+            bool isVerified = status == "approved";
             var residences = await _context.Residences
-                .Where(r => r.IsApprovedBySociety == isApproved)
+                .Where(r => r.IsApprovedBySociety == isVerified)
                 .Include(r => r.User)
                 .ToListAsync();
             var dtos = residences.Select(res => new ResidentByStatusDto

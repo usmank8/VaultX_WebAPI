@@ -146,7 +146,10 @@ namespace VaultX_WebAPI.Controllers
                     return BadRequest(new { message = "Invalid model state." });
                 }
 
-                var user = await _context.Users.SingleOrDefaultAsync(u => u.Email == model.Email);
+                // ✅ Include Residences to get approval status
+                var user = await _context.Users
+                    .Include(u => u.Residences)
+                    .SingleOrDefaultAsync(u => u.Email == model.Email);
 
                 if (user == null)
                 {
@@ -154,23 +157,23 @@ namespace VaultX_WebAPI.Controllers
                 }
 
                 if (!VerifyPassword(model.Password, user.Password))
-                    return Unauthorized("Invalid password");
+                    return Unauthorized(new { message = "Invalid password" });
 
-
-                //var refreshTokenString = BuildRefreshToken();
                 var accessTokenString = BuildAccessToken(user.Userid, user.Role);
-                //user.RefreshToken = refreshTokenString;
-                //var updateResult = await _userManager.UpdateAsync(user);
 
-                //if (!updateResult.Succeeded)
-                //    return BadRequest(new { message = "Failed to update user with refresh token.", errors = updateResult.Errors.Select(e => e.Description) });
+                // ✅ Get approval status from primary residence
+                var primaryResidence = user.Residences?.FirstOrDefault(r => r.IsPrimary);
+                var isApprovedBySociety = primaryResidence?.IsApprovedBySociety ?? false;
 
-
-                var response = Ok(new { message = "Login successful.", AccessToken = accessTokenString });
-
-                return response;
-
-            }catch (Exception ex)
+                // ✅ Return BOTH token and approval status
+                return Ok(new 
+                { 
+                    message = "Login successful.", 
+                    accessToken = accessTokenString,  // ✅ lowercase 'a'
+                    isApprovedBySociety = isApprovedBySociety  // ✅ Add approval flag
+                });
+            }
+            catch (Exception ex)
             {
                 return StatusCode(500, new { message = "An error occurred during login.", error = ex.Message });
             }
