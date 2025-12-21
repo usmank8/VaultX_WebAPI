@@ -12,42 +12,217 @@ using VaultX_WebAPI.Models;
 
 namespace VaultX_WebAPI.Controllers
 {
-    [ApiController]
     [Route("api/[controller]")]
-    public class VehicleController : ControllerBase
+    [ApiController]
+    [Authorize]
+    public class VehiclesController : ControllerBase
     {
         private readonly VaultxDbContext _context;
+        private const int MAX_VEHICLES_PER_RESIDENCE = 4;
 
-        public VehicleController(VaultxDbContext context)
+        public VehiclesController(VaultxDbContext context)
         {
             _context = context;
         }
 
-        [HttpPost("add")]
-        [Authorize(Roles = "resident")]
+        /// <summary>
+        /// Get all vehicles for the current user (across all their residences)
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> GetUserVehicles()
+        {
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId))
+                return Unauthorized(new { message = "User ID not found" });
+
+            // Get all user's residence IDs first
+            var userResidenceIds = await _context.Residences
+                .Where(r => r.Userid == userId)
+                .Select(r => r.Id)
+                .ToListAsync();
+
+            if (!userResidenceIds.Any())
+                return Ok(new List<object>()); // Return empty list if no residences
+
+            // Get vehicles for all user's residences
+            var vehicles = await _context.Vehicles
+                .Include(v => v.Resident)
+                .Where(v => userResidenceIds.Contains(v.Residentid))
+                .Select(v => new
+                {
+                    v.VehicleId,
+                    v.VehicleName,
+                    v.VehicleModel,
+                    v.VehicleType,
+                    v.VehicleLicensePlateNumber,
+                    VehicleRfidtagId = v.VehicleRFIDTagId,
+                    v.VehicleColor,
+                    ResidenceId = v.Residentid,
+                    ResidenceName = v.Resident != null ? v.Resident.Residence1 : null,
+                    ResidenceBlock = v.Resident != null ? v.Resident.Block : null,
+                    v.CreatedAt,
+                    v.UpdatedAt
+                })
+                .OrderByDescending(v => v.CreatedAt)
+                .ToListAsync();
+
+            return Ok(vehicles);
+        }
+
+        /// <summary>
+        /// Get vehicles for a specific residence
+        /// </summary>
+        [HttpGet("residence/{residenceId}")]
+        public async Task<IActionResult> GetVehiclesByResidence(Guid residenceId)
+        {
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId))
+                return Unauthorized(new { message = "User ID not found" });
+
+            // Verify residence belongs to user
+            var residence = await _context.Residences
+                .FirstOrDefaultAsync(r => r.Id == residenceId && r.Userid == userId);
+
+            if (residence == null)
+                return NotFound(new { message = "Residence not found or does not belong to you." });
+
+            var vehicles = await _context.Vehicles
+                .Where(v => v.Residentid == residenceId)
+                .Select(v => new
+                {
+                    v.VehicleId,
+                    v.VehicleName,
+                    v.VehicleModel,
+                    v.VehicleType,
+                    v.VehicleLicensePlateNumber,
+                    VehicleRfidtagId = v.VehicleRFIDTagId,
+                    v.VehicleColor,
+                    ResidenceId = v.Residentid,
+                    v.CreatedAt,
+                    v.UpdatedAt
+                })
+                .OrderByDescending(v => v.CreatedAt)
+                .ToListAsync();
+
+            return Ok(vehicles);
+        }
+
+        /// <summary>
+        /// Get a specific vehicle by ID
+        /// </summary>
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetVehicle(string id)
+        {
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId))
+                return Unauthorized(new { message = "User ID not found" });
+
+            var vehicle = await _context.Vehicles
+                .Include(v => v.Resident)
+                .FirstOrDefaultAsync(v => v.VehicleId == id);
+
+            if (vehicle == null)
+                return NotFound(new { message = "Vehicle not found" });
+
+            // Verify vehicle belongs to user's residence
+            if (vehicle.Resident == null || vehicle.Resident.Userid != userId)
+                return Forbid();
+
+            return Ok(new
+            {
+                vehicle.VehicleId,
+                vehicle.VehicleName,
+                vehicle.VehicleModel,
+                vehicle.VehicleType,
+                vehicle.VehicleLicensePlateNumber,
+                VehicleRfidtagId = vehicle.VehicleRFIDTagId,
+                vehicle.VehicleColor,
+                ResidenceId = vehicle.Residentid,
+                vehicle.CreatedAt,
+                vehicle.UpdatedAt
+            });
+        }
+
+        /// <summary>
+        /// Add a new vehicle to a residence (max 4 per residence)
+        /// </summary>
+        [HttpPost]
         public async Task<IActionResult> AddVehicle([FromBody] AddVehicleDto dto)
         {
             var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (userId == null) return Unauthorized();
+            if (string.IsNullOrEmpty(userId))
+                return Unauthorized(new { message = "User ID not found" });
 
-            var residence = await _context.Residences
-                .FirstOrDefaultAsync(r => r.Id == dto.ResidenceId && r.Userid == userId);
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
 
-            if (residence == null)
+            // Determine which residence to add vehicle to
+            Residence? residence;
+
+            if (dto.ResidenceId.HasValue)
             {
-                return NotFound("Residence not found or does not belong to you.");
+                // Use specified residence
+                residence = await _context.Residences
+                    .FirstOrDefaultAsync(r => r.Id == dto.ResidenceId.Value && r.Userid == userId);
+
+                if (residence == null)
+                    return NotFound(new { message = "Residence not found or does not belong to you." });
+            }
+            else
+            {
+                // Use primary residence as default
+                residence = await _context.Residences
+                    .FirstOrDefaultAsync(r => r.Userid == userId && r.IsPrimary);
+
+                if (residence == null)
+                    return NotFound(new { message = "No primary residence found. Please add a residence first." });
+            }
+
+            // Check if residence is approved
+            if (!residence.IsApprovedBySociety)
+                return BadRequest(new { message = "Cannot add vehicles to unapproved residence." });
+
+            // CHECK: Maximum 4 vehicles per residence
+            var vehicleCount = await _context.Vehicles
+                .CountAsync(v => v.Residentid == residence.Id);
+
+            if (vehicleCount >= MAX_VEHICLES_PER_RESIDENCE)
+            {
+                return BadRequest(new 
+                { 
+                    message = $"Maximum of {MAX_VEHICLES_PER_RESIDENCE} vehicles allowed per residence. You already have {vehicleCount} vehicles.",
+                    currentCount = vehicleCount,
+                    maxAllowed = MAX_VEHICLES_PER_RESIDENCE
+                });
+            }
+
+            // Check for duplicate license plate
+            var existingVehicle = await _context.Vehicles
+                .FirstOrDefaultAsync(v => v.VehicleLicensePlateNumber == dto.VehicleLicensePlateNumber);
+
+            if (existingVehicle != null)
+                return BadRequest(new { message = "A vehicle with this license plate already exists." });
+
+            // Check for duplicate RFID tag if provided
+            if (!string.IsNullOrEmpty(dto.VehicleRfidTagId))
+            {
+                var existingRfid = await _context.Vehicles
+                    .FirstOrDefaultAsync(v => v.VehicleRFIDTagId == dto.VehicleRfidTagId);
+
+                if (existingRfid != null)
+                    return BadRequest(new { message = "A vehicle with this RFID tag already exists." });
             }
 
             var vehicle = new Vehicle
             {
                 VehicleId = Guid.NewGuid().ToString(),
-                VehicleName = dto.VehicleName,
-                VehicleModel = dto.VehicleModel,
-                VehicleType = dto.VehicleType,
-                VehicleLicensePlateNumber = dto.VehicleLicensePlateNumber,
-                VehicleRFIDTagId = dto.VehicleRFIDTagId,
-                VehicleColor = dto.VehicleColor,
-                Residentid = dto.ResidenceId,
+                VehicleName = dto.VehicleName ?? string.Empty,
+                VehicleModel = dto.VehicleModel ?? string.Empty,
+                VehicleType = dto.VehicleType ?? string.Empty,
+                VehicleLicensePlateNumber = dto.VehicleLicensePlateNumber ?? string.Empty,
+                VehicleRFIDTagId = dto.VehicleRfidTagId ?? string.Empty,
+                VehicleColor = dto.VehicleColor ?? string.Empty,
+                Residentid = residence.Id,
                 IsGuest = false,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
@@ -56,105 +231,137 @@ namespace VaultX_WebAPI.Controllers
             _context.Vehicles.Add(vehicle);
             await _context.SaveChangesAsync();
 
-            return Ok(new { Message = "Vehicle added successfully.", VehicleId = vehicle.VehicleId });
-        }
-
-        [HttpGet]
-        [Authorize(Roles = "resident")]
-        public async Task<IActionResult> GetAllVehiclesByUserId()
-        {
-            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (userId == null) return Unauthorized();
-
-            var user = await _context.Users.FindAsync(userId);
-            if (user == null) return NotFound("User not found");
-            
-            var ownerName = $"{user.Firstname} {user.Lastname}";
-
-            var residences = await _context.Residences
-                .Where(r => r.Userid == userId)
-                .ToListAsync();
-
-            var residenceIds = residences.Select(r => r.Id).ToList();
-
-            if (!residenceIds.Any()) return Ok(new List<VehicleDto>());
-
-            // ✅ ADD .Include() TO LOAD RESIDENCE DATA
-            var vehicles = await _context.Vehicles
-                .Include(v => v.Resident)  // Load Residence navigation property
-                .Where(v => residenceIds.Contains(v.Residentid))
-                .ToListAsync();
-
-            var dtos = vehicles.Select(v => new VehicleDto
+            return CreatedAtAction(nameof(GetVehicle), new { id = vehicle.VehicleId }, new
             {
-                VehicleId = v.VehicleId,
-                VehicleName = v.VehicleName,
-                VehicleModel = v.VehicleModel,
-                VehicleType = v.VehicleType,
-                VehicleLicensePlateNumber = v.VehicleLicensePlateNumber,
-                VehicleRFIDTagId = v.VehicleRFIDTagId,
-                VehicleColor = v.VehicleColor,
-                IsGuest = v.IsGuest,
-                OwnerName = ownerName,
-                
-                // ✅ ADD ONLY THESE 3 PROPERTIES:
-                ResidenceId = v.Residentid,
-                ResidenceName = v.Resident?.AddressLine1 ?? "Unknown",
-                IsPrimaryResidence = v.Resident?.IsPrimary ?? false
-            }).ToList();
-
-            return Ok(dtos);
+                message = "Vehicle added successfully",
+                vehicle = new
+                {
+                    vehicle.VehicleId,
+                    vehicle.VehicleName,
+                    vehicle.VehicleModel,
+                    vehicle.VehicleType,
+                    vehicle.VehicleLicensePlateNumber,
+                    VehicleRfidtagId = vehicle.VehicleRFIDTagId,
+                    vehicle.VehicleColor,
+                    ResidenceId = vehicle.Residentid,
+                    vehicle.CreatedAt
+                },
+                vehicleCount = vehicleCount + 1,
+                remainingSlots = MAX_VEHICLES_PER_RESIDENCE - vehicleCount - 1
+            });
         }
 
         /// <summary>
-        /// Get all vehicles for a specific residence (Admin/Employee only)
-        /// Filters out guest vehicles
+        /// Update a vehicle
         /// </summary>
-        [HttpGet("residence/{residenceId}")]
-        [Authorize(Roles = "admin,employee")]
-        public async Task<IActionResult> GetVehiclesByResidence(Guid residenceId)
+        [HttpPut("{id}")]
+        public async Task<IActionResult> UpdateVehicle(string id, [FromBody] UpdateVehicleDto dto)
         {
-            // Verify residence exists
-            var residenceExists = await _context.Residences.AnyAsync(r => r.Id == residenceId);
-            if (!residenceExists)
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId))
+                return Unauthorized(new { message = "User ID not found" });
+
+            var vehicle = await _context.Vehicles
+                .Include(v => v.Resident)
+                .FirstOrDefaultAsync(v => v.VehicleId == id);
+
+            if (vehicle == null)
+                return NotFound(new { message = "Vehicle not found" });
+
+            // Verify vehicle belongs to user's residence
+            if (vehicle.Resident == null || vehicle.Resident.Userid != userId)
+                return Forbid();
+
+            // Update fields if provided
+            if (!string.IsNullOrEmpty(dto.VehicleName))
+                vehicle.VehicleName = dto.VehicleName;
+            if (!string.IsNullOrEmpty(dto.VehicleModel))
+                vehicle.VehicleModel = dto.VehicleModel;
+            if (!string.IsNullOrEmpty(dto.VehicleType))
+                vehicle.VehicleType = dto.VehicleType;
+            if (!string.IsNullOrEmpty(dto.VehicleLicensePlateNumber))
+                vehicle.VehicleLicensePlateNumber = dto.VehicleLicensePlateNumber;
+            if (!string.IsNullOrEmpty(dto.VehicleRfidTagId))
+                vehicle.VehicleRFIDTagId = dto.VehicleRfidTagId;
+            if (!string.IsNullOrEmpty(dto.VehicleColor))
+                vehicle.VehicleColor = dto.VehicleColor;
+
+            vehicle.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new
             {
-                return NotFound(new { message = "Residence not found" });
-            }
-
-            var vehicles = await _context.Vehicles
-                .Where(v => v.Residentid == residenceId && v.IsGuest == false)  // ✅ Fixed: Residentid (not ResidenceId)
-                .Select(v => new
+                message = "Vehicle updated successfully",
+                vehicle = new
                 {
-                    vehicleId = v.VehicleId,
-                    vehicleName = v.VehicleName,
-                    vehicleType = v.VehicleType,
-                    vehicleModel = v.VehicleModel,
-                    vehicleLicensePlateNumber = v.VehicleLicensePlateNumber,
-                    vehicleRFIDTagId = v.VehicleRFIDTagId,
-                    vehicleColor = v.VehicleColor,
-                    isGuest = v.IsGuest
-                })
-                .ToListAsync();
-
-            return Ok(vehicles);
+                    vehicle.VehicleId,
+                    vehicle.VehicleName,
+                    vehicle.VehicleModel,
+                    vehicle.VehicleType,
+                    vehicle.VehicleLicensePlateNumber,
+                    VehicleRfidtagId = vehicle.VehicleRFIDTagId,
+                    vehicle.VehicleColor,
+                    ResidenceId = vehicle.Residentid,
+                    vehicle.UpdatedAt
+                }
+            });
         }
-    }
 
-    public class VehicleDto
-    {
-        public string VehicleId { get; set; }
-        public string OwnerName { get; set; }
-        public string VehicleName { get; set; }
-        public string VehicleModel { get; set; }
-        public string VehicleType { get; set; }
-        public string VehicleLicensePlateNumber { get; set; }
-        public string VehicleRFIDTagId { get; set; }
-        public string VehicleColor { get; set; }
-        public bool IsGuest { get; set; }
-        
-        // ✅ ADD ONLY THESE 3 PROPERTIES:
-        public Guid ResidenceId { get; set; }
-        public string ResidenceName { get; set; } = string.Empty;
-        public bool IsPrimaryResidence { get; set; }
+        /// <summary>
+        /// Delete a vehicle
+        /// </summary>
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> DeleteVehicle(string id)
+        {
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId))
+                return Unauthorized(new { message = "User ID not found" });
+
+            var vehicle = await _context.Vehicles
+                .Include(v => v.Resident)
+                .FirstOrDefaultAsync(v => v.VehicleId == id);
+
+            if (vehicle == null)
+                return NotFound(new { message = "Vehicle not found" });
+
+            // Verify vehicle belongs to user's residence
+            if (vehicle.Resident == null || vehicle.Resident.Userid != userId)
+                return Forbid();
+
+            _context.Vehicles.Remove(vehicle);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Vehicle deleted successfully" });
+        }
+
+        /// <summary>
+        /// Get vehicle count for a residence
+        /// </summary>
+        [HttpGet("residence/{residenceId}/count")]
+        public async Task<IActionResult> GetVehicleCount(Guid residenceId)
+        {
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId))
+                return Unauthorized(new { message = "User ID not found" });
+
+            // Verify residence belongs to user
+            var residence = await _context.Residences
+                .FirstOrDefaultAsync(r => r.Id == residenceId && r.Userid == userId);
+
+            if (residence == null)
+                return NotFound(new { message = "Residence not found" });
+
+            var count = await _context.Vehicles.CountAsync(v => v.Residentid == residenceId);
+
+            return Ok(new
+            {
+                residenceId,
+                vehicleCount = count,
+                maxAllowed = MAX_VEHICLES_PER_RESIDENCE,
+                remainingSlots = MAX_VEHICLES_PER_RESIDENCE - count,
+                canAddMore = count < MAX_VEHICLES_PER_RESIDENCE
+            });
+        }
     }
 }

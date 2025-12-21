@@ -45,30 +45,33 @@ namespace VaultX_WebAPI.DTOs
     }
     public class AddVehicleDto
     {
-        public Guid ResidenceId { get; set; }  // ← ADD THIS LINE
         [Required]
-        [StringLength(100)]
-        public string VehicleName { get; set; } = null!;
+        public string VehicleName { get; set; } = string.Empty;
+        
+        public string? VehicleModel { get; set; }
+        
+        [Required]
+        public string VehicleType { get; set; } = string.Empty;
+        
+        [Required]
+        public string VehicleLicensePlateNumber { get; set; } = string.Empty;
+        
+        public string? VehicleRfidTagId { get; set; }
+        
+        public string? VehicleColor { get; set; }
+        
+        // ✅ Optional: Specify which residence (defaults to primary if not provided)
+        public Guid? ResidenceId { get; set; }
+    }
 
-        [Required]
-        [StringLength(50)]
-        public string VehicleModel { get; set; } = null!;
-
-        [Required]
-        [StringLength(20)]
-        public string VehicleLicensePlateNumber { get; set; } = null!;
-
-        [Required]
-        [StringLength(50)]
-        public string VehicleType { get; set; } = null!;
-
-        [Required]
-        [StringLength(50)]
-        public string VehicleRFIDTagId { get; set; } = null!;
-
-        [Required]
-        [StringLength(50)]
-        public string VehicleColor { get; set; } = null!;
+    public class UpdateVehicleDto
+    {
+        public string? VehicleName { get; set; }
+        public string? VehicleModel { get; set; }
+        public string? VehicleType { get; set; }
+        public string? VehicleLicensePlateNumber { get; set; }
+        public string? VehicleRfidTagId { get; set; }
+        public string? VehicleColor { get; set; }
     }
 
     public class AddGuestVehicleDto

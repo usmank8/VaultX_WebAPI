@@ -213,7 +213,7 @@ namespace VaultX_WebAPI.Controllers
 
                 
                 var residence = await _context.Residences
-                    .FirstOrDefaultAsync(r => r.User.Userid == userId && r.IsPrimary);
+                    .FirstOrDefaultAsync(r => r.Userid == userId && r.IsPrimary);
 
                 if (residence == null)
                 {
@@ -290,6 +290,108 @@ namespace VaultX_WebAPI.Controllers
             await _context.SaveChangesAsync();
 
             return Ok(new { Message = "Residence added successfully.", ResidenceId = residence.Id });
+        }
+
+        /// <summary>
+        /// Switch primary residence
+        /// </summary>
+        [HttpPatch("residences/{id}/set-primary")]
+        public async Task<IActionResult> SetPrimaryResidence(Guid id)
+        {
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId)) return Unauthorized();
+
+            // Verify residence belongs to user
+            var residence = await _context.Residences
+                .FirstOrDefaultAsync(r => r.Id == id && r.Userid == userId);
+
+            if (residence == null)
+                return NotFound(new { Message = "Residence not found." });
+
+            // Set all other residences to non-primary
+            var allResidences = await _context.Residences
+                .Where(r => r.Userid == userId)
+                .ToListAsync();
+
+            foreach (var r in allResidences)
+            {
+                r.IsPrimary = (r.Id == id);
+                r.UpdatedAt = DateTime.UtcNow;
+            }
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new { Message = "Primary residence updated successfully." });
+        }
+
+        /// <summary>
+        /// Delete a residence (cannot delete primary)
+        /// </summary>
+        [HttpDelete("residences/{id}")]
+        public async Task<IActionResult> DeleteResidence(Guid id)
+        {
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId)) return Unauthorized();
+
+            var residence = await _context.Residences
+                .Include(r => r.Guests)
+                .Include(r => r.Vehicles)
+                .FirstOrDefaultAsync(r => r.Id == id && r.Userid == userId);
+
+            if (residence == null)
+                return NotFound(new { Message = "Residence not found." });
+
+            if (residence.IsPrimary)
+                return BadRequest(new { Message = "Cannot delete primary residence." });
+
+            // Check if residence has guests or vehicles
+            if (residence.Guests.Any() || residence.Vehicles.Any())
+            {
+                return BadRequest(new 
+                { 
+                    Message = "Cannot delete residence with associated guests or vehicles.",
+                    GuestCount = residence.Guests.Count,
+                    VehicleCount = residence.Vehicles.Count
+                });
+            }
+
+            _context.Residences.Remove(residence);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { Message = "Residence deleted successfully." });
+        }
+
+        /// <summary>
+        /// Get detailed info for a specific residence
+        /// </summary>
+        [HttpGet("residences/{id}")]
+        public async Task<IActionResult> GetResidenceDetails(Guid id)
+        {
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId)) return Unauthorized();
+
+            var residence = await _context.Residences
+                .Include(r => r.Guests)
+                .Include(r => r.Vehicles)
+                .FirstOrDefaultAsync(r => r.Id == id && r.Userid == userId);
+
+            if (residence == null)
+                return NotFound(new { Message = "Residence not found." });
+
+            return Ok(new
+            {
+                id = residence.Id,
+                residence = residence.Residence1,
+                residenceType = residence.ResidenceType,
+                block = residence.Block,
+                address = residence.AddressLine1,
+                isPrimary = residence.IsPrimary,
+                isApprovedBySociety = residence.IsApprovedBySociety,
+                guestCount = residence.Guests.Count,
+                vehicleCount = residence.Vehicles.Count,
+                createdAt = residence.CreatedAt,
+                updatedAt = residence.UpdatedAt
+            });
         }
     }
 }

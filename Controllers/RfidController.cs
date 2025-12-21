@@ -7,6 +7,7 @@ namespace VaultX_WebAPI.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize(Roles = "admin,employee")]
     public class RfidController : ControllerBase
     {
         private readonly VaultxDbContext _context;
@@ -126,7 +127,6 @@ namespace VaultX_WebAPI.Controllers
         /// Get vehicle access history for the last 1 hour
         /// </summary>
         [HttpGet("history/hour")]
-        // [Authorize(Roles = "admin,employee")]
         public async Task<IActionResult> GetHistoryLastHour()
         {
             return await GetAccessHistory(DateTime.UtcNow.AddHours(-1));

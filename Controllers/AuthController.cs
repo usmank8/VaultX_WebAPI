@@ -89,7 +89,7 @@ namespace VaultX_WebAPI.Controllers
         {
             var otpRecord = await _context.Otps
                 .Include(o => o.UserUser)
-                .FirstOrDefaultAsync(o => o.UserUser.Email == dto.Email && o.Code == dto.Otp && !o.IsUsed && o.ExpiresAt > DateTime.UtcNow);
+                .FirstOrDefaultAsync(o => o.UserUser != null && o.UserUser.Email == dto.Email && o.Code == dto.Otp && !o.IsUsed && o.ExpiresAt > DateTime.UtcNow);
 
             if (otpRecord == null)
             {
@@ -99,8 +99,8 @@ namespace VaultX_WebAPI.Controllers
             try
             {
                 otpRecord.IsUsed = true;
-                otpRecord.UserUser.IsEmailVerified = true;
-                otpRecord.UserUser.UpdatedAt = DateTime.UtcNow;
+                otpRecord.UserUser!.IsEmailVerified = true;
+                otpRecord.UserUser!.UpdatedAt = DateTime.UtcNow;
                 await _context.SaveChangesAsync();
                 return Ok(new OtpResponseDto { Success = true, Message = "Email verified successfully." });
             }
@@ -112,10 +112,10 @@ namespace VaultX_WebAPI.Controllers
 
         private async Task SendOtpEmail(string email, string otp)
         {
-            var smtpHost = _config["Smtp:Host"];
-            var smtpPort = int.Parse(_config["Smtp:Port"]);
-            var smtpUser = _config["Smtp:Username"];
-            var smtpPass = _config["Smtp:Password"];
+            var smtpHost = _config["Smtp:Host"] ?? throw new InvalidOperationException("SMTP Host not configured");
+            var smtpPort = int.Parse(_config["Smtp:Port"] ?? "587");
+            var smtpUser = _config["Smtp:Username"] ?? throw new InvalidOperationException("SMTP Username not configured");
+            var smtpPass = _config["Smtp:Password"] ?? throw new InvalidOperationException("SMTP Password not configured");
 
             var smtpClient = new SmtpClient(smtpHost)
             {

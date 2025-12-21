@@ -229,7 +229,7 @@ namespace VaultX_WebAPI.Controllers
                     Userid = residentUserId,
                     ResidenceId = dto.ResidenceId,
                     VehicleId = vehicleId,  // Will be null if no vehicle details provided
-                    QrCode = null,
+                    QrCode = string.Empty,  // Will be set by GenerateQRCode
                     IsVerified = false,
                     VisitCompleted = false,
                     CreatedAt = DateTime.UtcNow,
@@ -783,6 +783,51 @@ namespace VaultX_WebAPI.Controllers
                 currentTime = now,
                 guests = guestDtos
             });
+        }
+
+        /// <summary>
+        /// Get guests for a specific residence
+        /// </summary>
+        [HttpGet("residence/{residenceId}")]
+        public async Task<IActionResult> GetGuestsByResidence(Guid residenceId)
+        {
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId))
+                return Unauthorized(new { message = "User ID not found" });
+
+            // Verify residence belongs to user
+            var residence = await _context.Residences
+                .FirstOrDefaultAsync(r => r.Id == residenceId && r.Userid == userId);
+
+            if (residence == null)
+                return NotFound(new { message = "Residence not found or does not belong to you." });
+
+            var guests = await _context.Guests
+                .Where(g => g.ResidenceId == residenceId)
+                .OrderByDescending(g => g.CreatedAt)
+                .Select(g => new
+                {
+                    g.GuestId,
+                    g.GuestName,
+                    g.GuestPhoneNumber,
+                    g.Gender,
+                    g.Eta,
+                    g.CheckoutTime,
+                    g.ActualArrivalTime,
+                    g.Status,
+                    g.QrCode,
+                    g.IsVerified,
+                    g.VisitCompleted,
+                    g.CreatedAt,
+                    IsExpired = g.CheckoutTime < DateTime.UtcNow,
+                    IsLate = g.Eta < DateTime.UtcNow && g.ActualArrivalTime == null,
+                    TimeRemaining = (g.CheckoutTime - DateTime.UtcNow).TotalHours > 0 
+                        ? $"{(int)(g.CheckoutTime - DateTime.UtcNow).TotalHours}h remaining"
+                        : "Expired"
+                })
+                .ToListAsync();
+
+            return Ok(guests);
         }
     }
 }
