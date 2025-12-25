@@ -428,6 +428,15 @@ namespace VaultX_WebAPI.DTOs
         public string Message { get; set; }
     }
 
+    public class changePasswordDto
+    {
+        [Required]
+        public string newPassword { get; set; } = string.Empty;
+        [Required]
+        public string email { get; set; } = string.Empty;
+
+    }
+
     public class AddResidenceDto
     {
         public string Residence { get; set; } = null!;

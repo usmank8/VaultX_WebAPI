@@ -55,26 +55,26 @@ namespace VaultX_WebAPI.Controllers
                 UpdatedAt = DateTime.UtcNow
             };
 
-            var otp = new Random().Next(100000, 999999).ToString();
-            var otpRecord = new Otp
-            {
-                Code = otp,
-                CreatedAt = DateTime.UtcNow,
-                ExpiresAt = DateTime.UtcNow.AddMinutes(10),
-                IsUsed = false,
-                UserUserid = user.Userid,
-                UserUser = user
-            };
+            //var otp = new Random().Next(100000, 999999).ToString();
+            //var otpRecord = new Otp
+            //{
+            //    Code = otp,
+            //    CreatedAt = DateTime.UtcNow,
+            //    ExpiresAt = DateTime.UtcNow.AddMinutes(10),
+            //    IsUsed = false,
+            //    UserUserid = user.Userid,
+            //    UserUser = user
+            //};
 
             try
             {
                 
                 _context.Users.Add(user);
-                _context.Otps.Add(otpRecord);
+                //_context.Otps.Add(otpRecord);
                 await _context.SaveChangesAsync();
 
                 
-                await SendOtpEmail(user.Email, otp);
+                //await SendOtpEmail(user.Email, otp);
 
                 return Ok(new { Message = "User registered. Please verify your email with the OTP sent.", UserId = user.Userid });
             }
@@ -84,12 +84,110 @@ namespace VaultX_WebAPI.Controllers
             }
         }
 
+        [HttpPost("change-password")]
+        public async Task<IActionResult> ChangePassword([FromBody] changePasswordDto dto)
+        {
+            if (dto.email == null || dto.newPassword == null)
+            {
+                return BadRequest("email or password must be provided");
+            }
+
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == dto.email);
+
+            if (user == null)
+            {
+                return BadRequest("No user found against this email");
+            }
+            
+            user.Password = BCrypt.Net.BCrypt.HashPassword(dto.newPassword);
+            user.UpdatedAt = DateTime.UtcNow;
+
+            try
+            {
+                await _context.SaveChangesAsync();
+                return Ok(new { Message = "Password changed successfully." });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { Message = "Failed to change password.", Error = ex.Message });
+            }
+        }
+
+        [HttpPost("send-otp")]
+        public async Task<IActionResult> SendOtp([FromBody] string email)
+        {
+            if (string.IsNullOrWhiteSpace(email))
+            {
+                return BadRequest("Email is required.");
+            }
+
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
+
+            if (user == null)
+            {
+                return Ok("OTP will be sent to the email if it exist.");
+            }
+
+            var otpRecord = await _context.Otps.FirstOrDefaultAsync(o => o.UserUserid == user.Userid);
+
+            var otp = new Random().Next(100000, 999999).ToString();
+            
+            if(otpRecord == null)
+            {
+                var newOtpRecord = new Otp
+                {
+                    Id = Guid.NewGuid(),
+                    Code = otp,
+                    CreatedAt = DateTime.UtcNow,
+                    ExpiresAt = DateTime.UtcNow.AddMinutes(10),
+                    IsUsed = false,
+                    UserUserid = user.Userid,
+                    UserUser = user
+                };
+
+                try
+                {
+                    _context.Otps.Add(newOtpRecord);
+                    await _context.SaveChangesAsync();
+                    await SendOtpEmail(email, otp);
+                    return Ok("OTP will be sent to the email if it exists.");
+                }
+                catch (Exception ex)
+                {
+                    return StatusCode(500, new { Message = "Failed to send OTP.", Error = ex.Message });
+                }
+            } else
+            {
+                otpRecord.Code = otp;
+                otpRecord.CreatedAt = DateTime.UtcNow;
+                otpRecord.ExpiresAt = DateTime.UtcNow.AddMinutes(10);
+                otpRecord.IsUsed = false;
+
+                try
+                {
+                    await _context.SaveChangesAsync();
+                    return Ok("OTP will be sent to the email if it exists.");
+                }
+                catch (Exception ex)
+                { 
+                    return StatusCode(500, new { Message = "Failed to change password.", Error = ex.Message });
+                }
+            }
+            
+        }
+
         [HttpPost("verify-otp")]
         public async Task<IActionResult> VerifyOtp([FromBody] OtpRequestDto dto)
         {
             var otpRecord = await _context.Otps
-                .Include(o => o.UserUser)
-                .FirstOrDefaultAsync(o => o.UserUser != null && o.UserUser.Email == dto.Email && o.Code == dto.Otp && !o.IsUsed && o.ExpiresAt > DateTime.UtcNow);
+                 .Include(o => o.UserUser)
+                 .Where(o => o.UserUser != null
+                             && o.UserUser.Email == dto.Email
+                             && o.Code == dto.Otp
+                             && !o.IsUsed
+                             && o.ExpiresAt > DateTime.UtcNow)
+                 .OrderByDescending(o => o.CreatedAt)
+                 .FirstOrDefaultAsync();
 
             if (otpRecord == null)
             {
