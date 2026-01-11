@@ -114,8 +114,10 @@ namespace VaultX_WebAPI.Controllers
         }
 
         [HttpPost("send-otp")]
-        public async Task<IActionResult> SendOtp([FromBody] string email)
+        public async Task<IActionResult> SendOtp([FromBody] SendOtpRequest request)
         {
+            var email = request.Email?.Trim();
+
             if (string.IsNullOrWhiteSpace(email))
             {
                 return BadRequest("Email is required.");
@@ -206,6 +208,11 @@ namespace VaultX_WebAPI.Controllers
             {
                 return StatusCode(500, new OtpResponseDto { Success = false, Message = "Failed to verify OTP.", Error = ex.Message });
             }
+        }
+
+        public class SendOtpRequest
+        {
+            public string Email { get; set; } = string.Empty;
         }
 
         private async Task SendOtpEmail(string email, string otp)
