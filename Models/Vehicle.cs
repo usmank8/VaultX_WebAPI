@@ -23,9 +23,9 @@ public partial class Vehicle
 
     public DateTime UpdatedAt { get; set; }
 
-    public Guid Residentid { get; set; }
+    public Guid? Residentid { get; set; }  // ✅ Made nullable to support ON DELETE SET NULL
 
-    public string VehicleColor { get; set; } = null!;
+    public string? VehicleColor { get; set; }
 
     public virtual Guest? Guest { get; set; }
 

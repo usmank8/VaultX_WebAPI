@@ -47,7 +47,7 @@ namespace VaultX_WebAPI.Controllers
             // Get vehicles for all user's residences
             var vehicles = await _context.Vehicles
                 .Include(v => v.Resident)
-                .Where(v => userResidenceIds.Contains(v.Residentid))
+                .Where(v => v.Residentid.HasValue && userResidenceIds.Contains(v.Residentid.Value))
                 .Select(v => new
                 {
                     v.VehicleId,
@@ -87,7 +87,7 @@ namespace VaultX_WebAPI.Controllers
                 return NotFound(new { message = "Residence not found or does not belong to you." });
 
             var vehicles = await _context.Vehicles
-                .Where(v => v.Residentid == residenceId)
+                .Where(v => v.Residentid.HasValue && v.Residentid.Value == residenceId)
                 .Select(v => new
                 {
                     v.VehicleId,
@@ -184,7 +184,7 @@ namespace VaultX_WebAPI.Controllers
 
             // CHECK: Maximum 4 vehicles per residence
             var vehicleCount = await _context.Vehicles
-                .CountAsync(v => v.Residentid == residence.Id);
+                .CountAsync(v => v.Residentid.HasValue && v.Residentid.Value == residence.Id);
 
             if (vehicleCount >= MAX_VEHICLES_PER_RESIDENCE)
             {
@@ -352,7 +352,7 @@ namespace VaultX_WebAPI.Controllers
             if (residence == null)
                 return NotFound(new { message = "Residence not found" });
 
-            var count = await _context.Vehicles.CountAsync(v => v.Residentid == residenceId);
+            var count = await _context.Vehicles.CountAsync(v => v.Residentid.HasValue && v.Residentid.Value == residenceId);
 
             return Ok(new
             {

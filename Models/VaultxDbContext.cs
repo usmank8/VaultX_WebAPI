@@ -380,6 +380,11 @@ public partial class VaultxDbContext : DbContext
                 .HasMaxLength(255)
                 .HasColumnName("vehicleType");
 
+            // ✅ Residentid is nullable to support ON DELETE SET NULL
+            entity.Property(e => e.Residentid)
+                .IsRequired(false)
+                .HasColumnName("residentid");
+
             entity.HasOne(d => d.Resident).WithMany(p => p.Vehicles)
                 .HasForeignKey(d => d.Residentid)
                 .OnDelete(DeleteBehavior.SetNull)

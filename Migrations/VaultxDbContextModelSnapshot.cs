@@ -462,7 +462,7 @@ namespace VaultX_WebAPI.Migrations
                         .HasColumnType("bit")
                         .HasColumnName("isGuest");
 
-                    b.Property<Guid>("Residentid")
+                    b.Property<Guid?>("Residentid")
                         .HasColumnType("uniqueidentifier")
                         .HasColumnName("residentid");
 
@@ -473,7 +473,6 @@ namespace VaultX_WebAPI.Migrations
                         .HasDefaultValueSql("(getdate())");
 
                     b.Property<string>("VehicleColor")
-                        .IsRequired()
                         .HasMaxLength(255)
                         .HasColumnType("nvarchar(255)")
                         .HasColumnName("vehicleColor");
@@ -633,7 +632,6 @@ namespace VaultX_WebAPI.Migrations
                         .WithMany("Vehicles")
                         .HasForeignKey("Residentid")
                         .OnDelete(DeleteBehavior.SetNull)
-                        .IsRequired()
                         .HasConstraintName("FK_768cdb766dfb621e783856f55ee");
 
                     b.Navigation("Resident");
