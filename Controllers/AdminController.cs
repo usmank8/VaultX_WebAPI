@@ -28,7 +28,7 @@ namespace VaultX_WebAPI.Controllers
                 .ToListAsync();
             if (!residences.Any())
             {
-                return Ok(new { Message = "No pending approvals found." });
+                return Ok(new List<PendingApprovalDto>());  // Return empty array
             }
             var dtos = residences.Select(res => new PendingApprovalDto
             {
