@@ -111,8 +111,8 @@ namespace VaultX_WebAPI.Controllers
             {
                 AddressLine1 = dto.Address ?? string.Empty,
                 Block = dto.Block ?? string.Empty,
-                Residence1 = dto.Residence.ToString().ToLower(),
-                ResidenceType = dto.ResidenceType.ToString().ToLower(),
+                Residence1 = dto.Residence.ToString().ToLower() ?? string.Empty,
+                ResidenceType = dto.ResidenceType.ToString().ToLower() ?? string.Empty,
                 IsPrimary = true,
                 User = user
             };
