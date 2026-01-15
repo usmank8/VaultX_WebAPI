@@ -185,7 +185,7 @@ namespace VaultX_WebAPI.DTOs
         public string GuestPhoneNumber { get; set; } = string.Empty;
         public string? Gender { get; set; }
         public DateTime Eta { get; set; }
-        public DateTime CheckoutTime { get; set; }
+        public DateTime? CheckoutTime { get; set; }
         public Guid? ResidenceId { get; set; }
         
         // ✅ Vehicle details (optional - will auto-create if provided)

@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using VaultX_WebAPI.Models;
 
@@ -11,9 +12,11 @@ using VaultX_WebAPI.Models;
 namespace VaultX_WebAPI.Migrations
 {
     [DbContext(typeof(VaultxDbContext))]
-    partial class VaultxDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260115105956_qrcodecolumntypechange")]
+    partial class qrcodecolumntypechange
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -125,9 +128,9 @@ namespace VaultX_WebAPI.Migrations
                         .HasColumnType("bit")
                         .HasColumnName("isVerified");
 
-                    b.Property<byte[]>("QrCode")
+                    b.Property<string>("QrCode")
                         .IsRequired()
-                        .HasColumnType("varbinary(max)")
+                        .HasColumnType("nvarchar(max)")
                         .HasColumnName("qrCode");
 
                     b.Property<Guid?>("ResidenceId")

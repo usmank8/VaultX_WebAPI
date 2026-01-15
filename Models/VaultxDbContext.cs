@@ -134,7 +134,8 @@ public partial class VaultxDbContext : DbContext
             entity.Property(e => e.IsVerified).HasColumnName("isVerified");
 
             entity.Property(e => e.QrCode)
-                .HasMaxLength(255)
+                //.HasMaxLength(255)
+                .HasColumnType("varbinary(max)")
                 .HasColumnName("qrCode");
 
             entity.Property(e => e.ResidenceId).HasColumnName("residenceId");

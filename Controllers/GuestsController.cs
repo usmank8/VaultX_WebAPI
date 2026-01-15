@@ -48,7 +48,7 @@ namespace VaultX_WebAPI.Controllers
                         g.CheckoutTime,
                         g.ActualArrivalTime,
                         Status = g.Status ?? "pending",
-                        g.QrCode,
+                        QrCode = Convert.ToBase64String(g.QrCode),
                         Userid = g.Userid ?? "",
                         g.ResidenceId,
                         g.VehicleId,
@@ -111,7 +111,7 @@ namespace VaultX_WebAPI.Controllers
                         g.CheckoutTime,
                         g.ActualArrivalTime,
                         g.Status,
-                        g.QrCode,
+                        QrCode = Convert.ToBase64String(g.QrCode),
                         g.IsVerified,
                         g.VisitCompleted,
                         g.CreatedAt,
@@ -161,7 +161,7 @@ namespace VaultX_WebAPI.Controllers
                     return BadRequest(new { message = "Invalid residence or you don't have permission" });
 
                 // ✅ VALIDATION: CheckoutTime must be after ETA
-                if (dto.CheckoutTime <= dto.Eta)
+                if (dto?.CheckoutTime <= dto.Eta)
                 {
                     return BadRequest(new
                     {
@@ -172,7 +172,7 @@ namespace VaultX_WebAPI.Controllers
                 }
 
                 // ✅ VALIDATION: CheckoutTime can't be in the past
-                if (dto.CheckoutTime < DateTime.UtcNow)
+                if (dto?.CheckoutTime < DateTime.UtcNow)
                 {
                     return BadRequest(new
                     {
@@ -223,13 +223,13 @@ namespace VaultX_WebAPI.Controllers
                     GuestPhoneNumber = dto.GuestPhoneNumber,
                     Gender = dto.Gender ?? "",
                     Eta = dto.Eta,
-                    CheckoutTime = dto.CheckoutTime,
+                    CheckoutTime = dto.CheckoutTime ?? DateTime.UtcNow.AddDays(1),
                     ActualArrivalTime = null,
                     Status = "pending",
                     Userid = residentUserId,
                     ResidenceId = dto.ResidenceId,
                     VehicleId = vehicleId,  // Will be null if no vehicle details provided
-                    QrCode = string.Empty,  // Will be set by GenerateQRCode
+                    //QrCode = string.Empty,  // Will be set by GenerateQRCode
                     IsVerified = false,
                     VisitCompleted = false,
                     CreatedAt = DateTime.UtcNow,
@@ -247,7 +247,7 @@ namespace VaultX_WebAPI.Controllers
 
                 _logger.LogInformation(
                     "Guest registered: {GuestId} by {UserId}. Valid from {ETA} to {CheckoutTime} ({Duration} hours)",
-                    guestId, residentUserId, dto.Eta, dto.CheckoutTime, validityDuration.TotalHours);
+                    guestId, residentUserId, dto.Eta, dto.CheckoutTime, validityDuration?.TotalHours);
 
                 return Ok(new
                 {
@@ -259,7 +259,7 @@ namespace VaultX_WebAPI.Controllers
                     checkoutTime = guest.CheckoutTime,
                     status = guest.Status,
                     validityWindow = $"{guest.Eta:HH:mm} - {guest.CheckoutTime:HH:mm}",
-                    validityDuration = $"{validityDuration.TotalHours:F1} hours"
+                    validityDuration = $"{validityDuration?.TotalHours:F1} hours"
                 });
             }
             catch (Exception ex)
@@ -686,14 +686,14 @@ namespace VaultX_WebAPI.Controllers
         // ============================================
         // HELPER: Generate QR Code
         // ============================================
-        private string GenerateQRCode(string guestId)
+        private byte[] GenerateQRCode(string guestId)
         {
             using (QRCodeGenerator qrGenerator = new QRCodeGenerator())
             {
                 QRCodeData qrCodeData = qrGenerator.CreateQrCode(guestId, QRCodeGenerator.ECCLevel.Q);
                 PngByteQRCode qrCode = new PngByteQRCode(qrCodeData);
                 byte[] qrCodeBytes = qrCode.GetGraphic(20);
-                return Convert.ToBase64String(qrCodeBytes);
+                return qrCodeBytes;
             }
         }
 

@@ -28,7 +28,7 @@ public partial class Guest
     public bool IsVerified { get; set; }
 
     // ===== QR CODE =====
-    public string QrCode { get; set; } = null!;
+    public byte[] QrCode { get; set; } = null!;
 
     // ===== RELATIONSHIPS (FOREIGN KEYS) =====
     public string? Userid { get; set; }  
