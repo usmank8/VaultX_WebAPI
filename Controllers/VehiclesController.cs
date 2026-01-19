@@ -47,7 +47,7 @@ namespace VaultX_WebAPI.Controllers
             // Get vehicles for all user's residences
             var vehicles = await _context.Vehicles
                 .Include(v => v.Resident)
-                .Where(v => v.Residentid.HasValue && userResidenceIds.Contains(v.Residentid.Value))
+                .Where(v => v.Residentid.HasValue && userResidenceIds.Contains(v.Residentid.Value) && !v.IsGuest)
                 .Select(v => new
                 {
                     v.VehicleId,
