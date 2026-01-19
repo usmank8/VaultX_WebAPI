@@ -12,7 +12,7 @@ namespace VaultX_WebAPI.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    [Authorize(Roles = "admin,employee")]
+    //[Authorize(Roles = "admin,employee")]
     public class ResidencesController : ControllerBase
     {
         private readonly VaultxDbContext _context;
@@ -93,12 +93,32 @@ namespace VaultX_WebAPI.Controllers
         }
 
         [HttpPost]
-        public async Task<ActionResult<Residence>> PostResidence(Residence residence)
+        public async Task<ActionResult<Residence>> PostResidence(ResidenceDto residence)
         {
-            _context.Residences.Add(residence);
+            var ResId = Guid.NewGuid();
+
+            var newResidence = new Residence
+            {
+                Id = ResId,
+                AddressLine1 = residence.AddressLine1 ?? string.Empty,
+                AddressLine2 = residence.AddressLine2 ?? string.Empty,
+                ResidenceType = residence.ResidenceType,
+                Residence1 = residence.Residence1 ?? string.Empty,
+                IsPrimary = residence.IsPrimary ?? true,
+                IsApprovedBySociety = residence.IsApprovedBySociety,
+                ApprovedBy = residence.ApprovedBy ?? string.Empty,
+                FlatNumber = residence.FlatNumber ?? string.Empty,
+                Block = residence.Block ?? string.Empty,
+                Userid = residence.Userid,
+                ApprovedAt = residence.ApprovedAt,
+                CreatedAt = residence.CreatedAt,
+                UpdatedAt = residence.UpdatedAt
+            };
+
+            _context.Residences.Add(newResidence);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction("GetResidence", new { id = residence.Id }, residence);
+            return CreatedAtAction("GetResidence", new { id = newResidence.Id }, residence);
         }
 
         [HttpDelete("{id}")]

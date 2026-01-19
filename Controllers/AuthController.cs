@@ -168,6 +168,7 @@ namespace VaultX_WebAPI.Controllers
                 try
                 {
                     await _context.SaveChangesAsync();
+                    await SendOtpEmail(email, otp);
                     return Ok("OTP will be sent to the email if it exists.");
                 }
                 catch (Exception ex)

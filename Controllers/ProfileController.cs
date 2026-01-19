@@ -257,7 +257,8 @@ namespace VaultX_WebAPI.Controllers
                 r.Block,
                 Address = r.AddressLine1,  // ← CHANGED from r.Address
                 r.IsPrimary,
-                VehicleCount = r.Vehicles.Count
+                VehicleCount = r.Vehicles.Count,
+                r.IsApprovedBySociety
             }).ToList();
 
             return Ok(result);
