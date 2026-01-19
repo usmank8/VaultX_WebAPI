@@ -167,7 +167,8 @@ namespace VaultX_WebAPI.DTOs
 
     public class ResidentByStatusDto
     {
-        public string ResidentId { get; set; }
+        public Guid ResidenceId { get; set; }      // Actual residence ID
+        public string UserId { get; set; }          // User's unique ID
         public string Firstname { get; set; }
         public string Lastname { get; set; }
         public string Cnic { get; set; }
@@ -177,6 +178,8 @@ namespace VaultX_WebAPI.DTOs
         public string Block { get; set; }
         public string Residence { get; set; }
         public string ResidenceType { get; set; }
+        public string? FlatNumber { get; set; }
+        public bool IsPrimary { get; set; }
     }
 
     public class AddGuestDto

@@ -63,7 +63,8 @@ namespace VaultX_WebAPI.Controllers
                 .ToListAsync();
             var dtos = residences.Select(res => new ResidentByStatusDto
             {
-                ResidentId = res.User.Userid,
+                ResidenceId = res.Id,                              // Actual residence ID
+                UserId = res.User.Userid,                          // User's unique ID
                 Firstname = res.User.Firstname ?? string.Empty,
                 Lastname = res.User.Lastname ?? string.Empty,
                 Cnic = res.User.Cnic ?? string.Empty,
@@ -72,7 +73,9 @@ namespace VaultX_WebAPI.Controllers
                 AddressLine1 = res.AddressLine1 ?? string.Empty,
                 Block = res.Block ?? string.Empty,
                 Residence = res.Residence1,
-                ResidenceType = res.ResidenceType
+                ResidenceType = res.ResidenceType,
+                FlatNumber = res.FlatNumber,
+                IsPrimary = res.IsPrimary
             }).ToList();
             return Ok(dtos);
         }
@@ -120,6 +123,76 @@ namespace VaultX_WebAPI.Controllers
                 ResidenceId = residence.Id,
                 FlatNumber = residence.Residence1
             });
+        }
+
+        /// <summary>
+        /// Get vehicles for a specific residence (Admin only - no ownership check)
+        /// </summary>
+        [HttpGet("vehicles/residence/{residenceId}")]
+        public async Task<IActionResult> GetVehiclesByResidenceAdmin(Guid residenceId)
+        {
+            var residence = await _context.Residences
+                .FirstOrDefaultAsync(r => r.Id == residenceId);
+
+            if (residence == null)
+                return NotFound(new { message = "Residence not found." });
+
+            var vehicles = await _context.Vehicles
+                .Where(v => v.Residentid.HasValue && v.Residentid.Value == residenceId)
+                .Select(v => new
+                {
+                    v.VehicleId,
+                    v.VehicleName,
+                    v.VehicleModel,
+                    v.VehicleType,
+                    v.VehicleLicensePlateNumber,
+                    VehicleRFIDTagId = v.VehicleRFIDTagId,
+                    v.VehicleColor,
+                    ResidenceId = v.Residentid,
+                    IsGuest = false,
+                    v.CreatedAt,
+                    v.UpdatedAt
+                })
+                .OrderByDescending(v => v.CreatedAt)
+                .ToListAsync();
+
+            return Ok(vehicles);
+        }
+
+        /// <summary>
+        /// Get guests for a specific residence (Admin only - no ownership check)
+        /// </summary>
+        [HttpGet("guests/residence/{residenceId}")]
+        public async Task<IActionResult> GetGuestsByResidenceAdmin(Guid residenceId)
+        {
+            var residence = await _context.Residences
+                .FirstOrDefaultAsync(r => r.Id == residenceId);
+
+            if (residence == null)
+                return NotFound(new { message = "Residence not found." });
+
+            var guests = await _context.Guests
+                .Where(g => g.ResidenceId == residenceId)
+                .OrderByDescending(g => g.CreatedAt)
+                .Select(g => new
+                {
+                    g.GuestId,
+                    g.GuestName,
+                    g.GuestPhoneNumber,
+                    g.Gender,
+                    g.Eta,
+                    g.CheckoutTime,
+                    g.ActualArrivalTime,
+                    g.Status,
+                    g.IsVerified,
+                    g.VisitCompleted,
+                    g.CreatedAt,
+                    IsExpired = g.CheckoutTime < DateTime.UtcNow,
+                    IsActive = g.IsVerified && !g.VisitCompleted && g.CheckoutTime >= DateTime.UtcNow
+                })
+                .ToListAsync();
+
+            return Ok(guests);
         }
     }
 }
