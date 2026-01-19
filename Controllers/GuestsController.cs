@@ -316,18 +316,23 @@ namespace VaultX_WebAPI.Controllers
                     });
                 }
 
-                // ✅ CHECK 2: Guest arrived too early
-                if (now < guest.Eta)
+                // ✅ CHECK 2: Guest arrived too early (more than 2 hours early)
+                var earlyArrivalWindow = TimeSpan.FromHours(23);
+                var earliestAllowedTime = guest.Eta - earlyArrivalWindow;
+                
+                if (now < earliestAllowedTime)
                 {
-                    var minutesEarly = (guest.Eta - now).TotalMinutes;
-                    _logger.LogWarning("Guest {GuestId} arrived {Minutes} minutes early", guestId, minutesEarly);
+                    var minutesTooEarly = (earliestAllowedTime - now).TotalMinutes;
+                    _logger.LogWarning("Guest {GuestId} arrived {Minutes} minutes too early (outside 2-hour window)", guestId, minutesTooEarly);
                     return BadRequest(new
                     {
                         success = false,
-                        message = $"⏰ Guest is {minutesEarly:F0} minutes early",
-                        hint = $"Please arrive after {guest.Eta:HH:mm}",
+                        message = $"⏰ Guest is too early",
+                        hint = $"You can arrive from {earliestAllowedTime:HH:mm} onwards (up to 2 hours before ETA)",
+                        earliestAllowedTime = earliestAllowedTime,
                         eta = guest.Eta,
-                        currentTime = now
+                        currentTime = now,
+                        minutesUntilEarliestEntry = minutesTooEarly
                     });
                 }
 
