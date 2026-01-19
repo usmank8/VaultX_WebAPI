@@ -100,7 +100,8 @@ namespace VaultX_WebAPI.Controllers
                     v.VehicleColor,
                     ResidenceId = v.Residentid,
                     v.CreatedAt,
-                    v.UpdatedAt
+                    v.UpdatedAt,
+                    v.IsGuest
                 })
                 .OrderByDescending(v => v.CreatedAt)
                 .ToListAsync();
